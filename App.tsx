@@ -1,19 +1,21 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { 
-  Sparkles, Image as ImageIcon, Package, Send, Loader2, 
-  Clock, ChevronRight, Upload, Coins, 
+import {
+  Sparkles, Image as ImageIcon, Package, Send, Loader2,
+  Clock, ChevronRight, Upload, Coins,
   CreditCard, Layout, Smartphone as PhoneIcon, X, Save, Archive, ClipboardList,
   Heart, TrendingUp, Trash2, Copy, Wallet, ShoppingCart, Truck, CheckCircle2, Box,
   User as UserIcon, Palette, Eye, RotateCcw, ShieldCheck
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import OpenAI from 'openai';
 import { Category, AppLayer, DesignState, User, SavedArtwork, OrderStatus, CartItem } from './types';
 import { CATEGORIES, DESIGN_STYLES } from './constants';
 
 const App: React.FC = () => {
   const [activeLayer, setActiveLayer] = useState<AppLayer>(AppLayer.DESIGN);
   const [user, setUser] = useState<User>({ phone: '', points: 0, gold: 0, isLoggedIn: false });
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'qianwen'>('gemini');
   const [showLogin, setShowLogin] = useState(false);
   const [showPay, setShowPay] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
@@ -49,11 +51,19 @@ const App: React.FC = () => {
   const leadTimeInfo = useMemo(() => `${3 + (currentMaterial?.timeOffset || 0)}-${5 + (currentMaterial?.timeOffset || 0)}个工作日`, [currentMaterial]);
 
   useEffect(() => {
-    const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("API_KEY missing - please configure GEMINI_API_KEY in environment variables");
+    const geminiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+    const qianwenKey = import.meta.env.VITE_QIANWEN_API_KEY;
+
+    if (!geminiKey && !qianwenKey) {
+      console.warn("❌ No API Key configured - please configure GEMINI_API_KEY or QIANWEN_API_KEY");
     } else {
-      console.log("✅ API Key configured");
+      if (geminiKey) console.log("✅ Gemini API Key configured");
+      if (qianwenKey) console.log("✅ Qianwen API Key configured");
+
+      // Auto-switch to Qianwen if Gemini is not available
+      if (!geminiKey && qianwenKey) {
+        setAiProvider('qianwen');
+      }
     }
   }, []);
 
@@ -125,10 +135,17 @@ const App: React.FC = () => {
   // 场景化渲染逻辑核心
   const handleFinalPreview = async () => {
     if (!design.artworkUrl) return;
+
+    // Qianwen doesn't support image generation
+    if (aiProvider === 'qianwen') {
+      alert("⚠️ 千问API不支持图片生成，请切换到 Gemini");
+      return;
+    }
+
     setIsPreviewing(true);
     try {
       const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not configured");
+      if (!apiKey) throw new Error("Gemini API Key not configured");
       const ai = new GoogleGenAI({ apiKey });
       const colorName = currentCategory?.options.colors?.find(c => c.id === selectedColorId)?.name || '白色';
       
@@ -172,10 +189,50 @@ const App: React.FC = () => {
     if (user.points < 10) { setShowPay(true); return; }
     if (!design.prompt) return;
 
+    // Use Qianwen to generate enhanced prompt
+    if (aiProvider === 'qianwen') {
+      setIsGenerating(true);
+      try {
+        const qianwenKey = import.meta.env.VITE_QIANWEN_API_KEY;
+        if (!qianwenKey) throw new Error("Qianwen API Key not configured");
+
+        const client = new OpenAI({
+          apiKey: qianwenKey,
+          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+        });
+
+        const completion = await client.chat.completions.create({
+          model: 'qwen-plus',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional product designer. Generate detailed, creative design prompts based on user ideas. Return only the enhanced prompt text.'
+            },
+            {
+              role: 'user',
+              content: `Enhance this product design idea: "${design.prompt}". Make it more detailed and professional for ${currentCategory?.name}.`
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 500
+        });
+
+        const enhancedPrompt = completion.choices[0]?.message?.content || design.prompt;
+        setDesign(prev => ({ ...prev, prompt: enhancedPrompt }));
+        alert("✅ 千问已优化你的设计描述！现在请切换到 Gemini 生成图片。");
+      } catch (e) {
+        alert("❌ 千问API调用失败: " + (e as Error).message);
+      } finally {
+        setIsGenerating(false);
+      }
+      return;
+    }
+
+    // Use Gemini to generate images
     setIsGenerating(true);
     try {
       const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) throw new Error("API Key not configured");
+      if (!apiKey) throw new Error("Gemini API Key not configured");
       const ai = new GoogleGenAI({ apiKey });
       const stylePrompt = DESIGN_STYLES.find(s => s.id === design.style)?.prompt || '';
       
@@ -433,6 +490,14 @@ const App: React.FC = () => {
             <div className="px-2.5 py-1 bg-green-50 text-green-600 rounded-xl flex items-center border border-green-100 shadow-sm">
               <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /><span className="text-[11px] font-black">已加密</span>
             </div>
+            <select
+              value={aiProvider}
+              onChange={(e) => setAiProvider(e.target.value as 'gemini' | 'qianwen')}
+              className="px-2.5 py-1 bg-gray-50 text-gray-600 rounded-xl border border-gray-200 shadow-sm text-[11px] font-black outline-none cursor-pointer"
+            >
+              <option value="gemini">🚀 Gemini</option>
+              <option value="qianwen">☁️ 千问</option>
+            </select>
           </div>
         </div>
         {!user.isLoggedIn ? (
