@@ -196,11 +196,15 @@ const App: React.FC = () => {
         const qianwenKey = import.meta.env.VITE_QIANWEN_API_KEY;
         if (!qianwenKey) throw new Error("Qianwen API Key not configured");
 
+        const baseURL = import.meta.env.VITE_QIANWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+
         const client = new OpenAI({
           apiKey: qianwenKey,
-          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          baseURL: baseURL,
           dangerouslyAllowBrowser: true // 允许在浏览器中调用（注意安全风险）
         });
+
+        console.log('🔵 Using Qianwen API:', baseURL);
 
         const completion = await client.chat.completions.create({
           model: 'qwen-plus',
