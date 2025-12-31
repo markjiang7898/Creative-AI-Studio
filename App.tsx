@@ -49,8 +49,11 @@ const App: React.FC = () => {
   const leadTimeInfo = useMemo(() => `${3 + (currentMaterial?.timeOffset || 0)}-${5 + (currentMaterial?.timeOffset || 0)}个工作日`, [currentMaterial]);
 
   useEffect(() => {
-    if (!process.env.API_KEY) {
-      console.warn("API_KEY missing");
+    const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("API_KEY missing - please configure GEMINI_API_KEY in environment variables");
+    } else {
+      console.log("✅ API Key configured");
     }
   }, []);
 
@@ -124,7 +127,9 @@ const App: React.FC = () => {
     if (!design.artworkUrl) return;
     setIsPreviewing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not configured");
+      const ai = new GoogleGenAI({ apiKey });
       const colorName = currentCategory?.options.colors?.find(c => c.id === selectedColorId)?.name || '白色';
       
       let previewPrompt = `Generate a ultra-realistic 4K lifestyle photography for a ${currentCategory?.name}.`;
@@ -169,7 +174,9 @@ const App: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("API Key not configured");
+      const ai = new GoogleGenAI({ apiKey });
       const stylePrompt = DESIGN_STYLES.find(s => s.id === design.style)?.prompt || '';
       
       let productTerm = currentCategory?.name;
