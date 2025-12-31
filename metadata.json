@@ -1,0 +1,7 @@
+{
+  "name": "AI设计定制小程序",
+  "description": "A high-end design platform integrating Generative AI for custom product creation, from AI design and SKU configuration to lifestyle scene preview and order tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
