@@ -198,7 +198,8 @@ const App: React.FC = () => {
 
         const client = new OpenAI({
           apiKey: qianwenKey,
-          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          dangerouslyAllowBrowser: true // 允许在浏览器中调用（注意安全风险）
         });
 
         const completion = await client.chat.completions.create({
