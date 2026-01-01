@@ -53,9 +53,16 @@ const App: React.FC = () => {
   useEffect(() => {
     const geminiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
     const qianwenKey = import.meta.env.VITE_QIANWEN_API_KEY;
+    const qianwenBaseURL = import.meta.env.VITE_QIANWEN_BASE_URL;
+
+    console.log('🔍 API Configuration Check:');
+    console.log('- Gemini Key:', geminiKey ? `✅ (${geminiKey.substring(0, 10)}...)` : '❌ Not configured');
+    console.log('- Qianwen Key:', qianwenKey ? `✅ (${qianwenKey.substring(0, 10)}...)` : '❌ Not configured');
+    console.log('- Qianwen URL:', qianwenBaseURL || 'Using default (China)');
 
     if (!geminiKey && !qianwenKey) {
       console.warn("❌ No API Key configured - please configure GEMINI_API_KEY or QIANWEN_API_KEY");
+      alert("⚠️ 警告：未配置任何 API Key！\n\n请在 Vercel 环境变量中配置：\n- VITE_GEMINI_API_KEY（用于图片生成）\n- VITE_QIANWEN_API_KEY（可选，用于优化描述）");
     } else {
       if (geminiKey) console.log("✅ Gemini API Key configured");
       if (qianwenKey) console.log("✅ Qianwen API Key configured");
@@ -63,6 +70,7 @@ const App: React.FC = () => {
       // Auto-switch to Qianwen if Gemini is not available
       if (!geminiKey && qianwenKey) {
         setAiProvider('qianwen');
+        console.log("🔄 Auto-switched to Qianwen");
       }
     }
   }, []);
@@ -177,8 +185,10 @@ const App: React.FC = () => {
         .map(part => `data:image/png;base64,${part.inlineData!.data}`);
 
       if (newMockups.length > 0) setDesign(prev => ({ ...prev, mockupUrls: newMockups }));
-    } catch (e) {
-      alert("场景预览渲染失败，AI 引擎正忙。");
+    } catch (e: any) {
+      console.error('❌ Preview Error:', e);
+      const errorMessage = e?.message || 'Unknown error';
+      alert(`❌ 场景预览失败: ${errorMessage}\n\n请检查:\n1. 是否已生成设计图\n2. Gemini API 是否正常\n3. 网络连接是否正常`);
     } finally {
       setIsPreviewing(false);
     }
@@ -289,8 +299,10 @@ const App: React.FC = () => {
 
       setDesign(prev => ({ ...prev, artworkUrl: mainArt, mockupUrls: mockups }));
       setUser(prev => ({ ...prev, points: prev.points - 10 }));
-    } catch (e) {
-      alert("AI 引擎异常，请稍后重试。");
+    } catch (e: any) {
+      console.error('❌ Generate Error:', e);
+      const errorMessage = e?.message || 'Unknown error';
+      alert(`❌ 生成失败: ${errorMessage}\n\n请检查:\n1. 是否配置了正确的 API Key\n2. Gemini 配额是否充足\n3. 网络连接是否正常`);
     } finally {
       setIsGenerating(false);
     }
